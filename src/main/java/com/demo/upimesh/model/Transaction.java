@@ -22,6 +22,9 @@ public class Transaction {
     @Column(nullable = false, unique = true, length = 64)
     private String packetHash; // SHA-256 hex of the encrypted packet
 
+    @Column(nullable = false, unique = true, length = 36)
+    private String paymentNonce;
+
     @Column(nullable = false)
     private String senderVpa;
 
@@ -80,4 +83,12 @@ public class Transaction {
 
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
+
+    public String getPaymentNonce() {
+        return paymentNonce;
+    }
+
+    public void setPaymentNonce(String paymentNonce) {
+        this.paymentNonce = paymentNonce;
+    }
 }

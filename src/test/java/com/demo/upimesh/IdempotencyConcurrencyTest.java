@@ -108,4 +108,57 @@ class IdempotencyConcurrencyTest {
         assertEquals(0, original.getAmount().compareTo(decrypted.getAmount()));
         assertEquals(original.getNonce(), decrypted.getNonce());
     }
+
+@Test
+void sameNonceWithDifferentCiphertextCannotSettleTwice() throws Exception {
+    BigDecimal aliceBefore =
+            accounts.findById("alice@demo").orElseThrow().getBalance();
+    BigDecimal bobBefore =
+            accounts.findById("bob@demo").orElseThrow().getBalance();
+
+    long signedAt = System.currentTimeMillis();
+
+    // Two payment instructions with the same nonce but different ciphertexts.
+    PaymentInstruction first = new PaymentInstruction(
+            "alice@demo", "bob@demo", new BigDecimal("100.00"),
+            "test-hash", "replay-test-nonce", signedAt);
+
+    PaymentInstruction replay = new PaymentInstruction(
+            "alice@demo", "bob@demo", new BigDecimal("100.00"),
+            "test-hash", "replay-test-nonce", signedAt);
+
+    MeshPacket packet1 = demoService.createPacket(
+            "alice@demo", "bob@demo", new BigDecimal("100.00"), "1234", 5);
+
+    // Encrypt both instructions independently: AES-GCM should produce
+    // different ciphertexts for independently generated encryption parameters.
+    String ciphertext1 = crypto.encrypt(first, serverKey.getPublicKey());
+    String ciphertext2 = crypto.encrypt(replay, serverKey.getPublicKey());
+
+    assertNotEquals(ciphertext1, ciphertext2);
+
+    packet1.setCiphertext(ciphertext1);
+
+    MeshPacket packet2 = demoService.createPacket(
+            "alice@demo", "bob@demo", new BigDecimal("100.00"), "1234", 5);
+    packet2.setCiphertext(ciphertext2);
+
+    BridgeIngestionService.IngestResult result1 =
+            bridge.ingest(packet1, "bridge-test-1", 1);
+    BridgeIngestionService.IngestResult result2 =
+            bridge.ingest(packet2, "bridge-test-2", 1);
+
+    assertEquals("SETTLED", result1.outcome());
+    assertNotEquals("SETTLED", result2.outcome(),
+            "A payment nonce must not settle twice");
+
+    BigDecimal aliceAfter =
+            accounts.findById("alice@demo").orElseThrow().getBalance();
+    BigDecimal bobAfter =
+            accounts.findById("bob@demo").orElseThrow().getBalance();
+
+    assertEquals(aliceBefore.subtract(new BigDecimal("100.00")), aliceAfter);
+    assertEquals(bobBefore.add(new BigDecimal("100.00")), bobAfter);
+}
+
 }

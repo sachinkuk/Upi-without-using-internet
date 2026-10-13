@@ -69,8 +69,18 @@ public class BridgeIngestionService {
             }
 
             // ---- Settle ----
-            Transaction tx = settlement.settle(instruction, packetHash, bridgeNodeId, hopCount);
+                
+        try {
+            Transaction tx = settlement.settle(
+                    instruction, packetHash, bridgeNodeId, hopCount);
             return IngestResult.settled(packetHash, tx);
+        } catch (IllegalStateException e) {
+            if ("DUPLICATE_PAYMENT_NONCE".equals(e.getMessage())) {
+                log.info("Duplicate payment nonce dropped: {}", instruction.getNonce());
+                return IngestResult.duplicate(packetHash);
+            }
+            throw e;
+        }
 
         } catch (Exception e) {
             log.error("Ingestion error: {}", e.getMessage(), e);

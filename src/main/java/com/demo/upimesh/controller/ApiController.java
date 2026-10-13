@@ -21,6 +21,7 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = "${FRONTEND_ORIGIN:http://localhost:5174}")
 public class ApiController {
 
     @Autowired private ServerKeyHolder serverKey;
